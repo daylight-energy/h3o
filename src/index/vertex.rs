@@ -3,7 +3,7 @@ use crate::{
     coord::FaceIJK, error, CellIndex, Direction, LatLng, NUM_HEX_VERTS,
     NUM_PENT_VERTS,
 };
-use core::{cmp::Ordering, fmt, num::NonZeroU64, str::FromStr};
+use core::{cmp::Ordering, fmt, str::FromStr};
 
 /// Maximum value for a cell vertex.
 const MAX: u8 = 5;
@@ -144,7 +144,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Vertex {
 /// - [H3 Index Inspector](https://observablehq.com/@nrabinowitz/h3-index-inspector?collection=@nrabinowitz/h3)
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct VertexIndex(NonZeroU64);
+pub struct VertexIndex(u64);
 
 impl VertexIndex {
     /// Returns the cell vertex.
@@ -159,7 +159,7 @@ impl VertexIndex {
     #[must_use]
     pub const fn vertex(self) -> Vertex {
         // SAFETY: `VertexIndex` only contains valid cell vertex (invariant).
-        Vertex::new_unchecked(bits::get_vertex(self.0.get()))
+        Vertex::new_unchecked(bits::get_vertex(self.0))
     }
 
     /// Returns the owner hexagon from the vertex index.
@@ -173,7 +173,7 @@ impl VertexIndex {
     /// ```
     #[must_use]
     pub fn owner(self) -> CellIndex {
-        let bits = bits::set_mode(self.0.get(), IndexMode::Cell);
+        let bits = bits::set_mode(self.0, IndexMode::Cell);
         CellIndex::new_unchecked(bits::clr_vertex(bits))
     }
 
@@ -186,7 +186,7 @@ impl VertexIndex {
         // XXX: cannot `debug_assert!` a `Self::try_from` here.
         // `try_from` relies on `CellIndex::vertex` for canonical check,
         // which itself calls `new_unchecked` => infinite recursion, stack overflow.
-        Self(NonZeroU64::new(value).expect("valid vertex index"))
+        Self(value)
     }
 }
 
@@ -196,8 +196,7 @@ impl Ord for VertexIndex {
         const MASK: u64 = 0xf80f_ffff_ffff_ffff;
 
         // Order by index first, then by vertex.
-        (self.0.get() & MASK, self.vertex())
-            .cmp(&(other.0.get() & MASK, other.vertex()))
+        (self.0 & MASK, self.vertex()).cmp(&(other.0 & MASK, other.vertex()))
     }
 }
 
@@ -209,7 +208,7 @@ impl PartialOrd for VertexIndex {
 
 impl From<VertexIndex> for u64 {
     fn from(value: VertexIndex) -> Self {
-        value.0.get()
+        value.0
     }
 }
 
@@ -240,7 +239,7 @@ impl TryFrom<u64> for VertexIndex {
         }
 
         // XXX: 0 is rejected by the mode check (mode cannot be 0).
-        Ok(Self(NonZeroU64::new(value).expect("non-zero vertex index")))
+        Ok(Self(value))
     }
 }
 
@@ -248,7 +247,7 @@ impl From<VertexIndex> for LatLng {
     // Get the geocoordinates of an H3 vertex.
     fn from(value: VertexIndex) -> Self {
         // SAFETY: VertexIndex always contains a valid vertex value.
-        let vertex = Vertex::new_unchecked(bits::get_vertex(value.0.get()));
+        let vertex = Vertex::new_unchecked(bits::get_vertex(value.0));
         let owner = value.owner();
 
         // Get the single vertex from the boundary.
