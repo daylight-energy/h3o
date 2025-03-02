@@ -71,14 +71,7 @@ impl LatLng {
         lat: f64,
         lng: f64,
     ) -> Result<Self, InvalidLatLng> {
-        if !lat.is_finite() {
-            return Err(InvalidLatLng::new(lat, "infinite latitude"));
-        }
-        if !lng.is_finite() {
-            return Err(InvalidLatLng::new(lng, "infinite longitude"));
-        }
-
-        Ok(Self { lat, lng })
+       Ok(Self { lat, lng })
     }
 
     /// Latitude, in degrees.
